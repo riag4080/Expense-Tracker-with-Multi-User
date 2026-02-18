@@ -1,84 +1,163 @@
-#  ExpenseTracker — Full-Stack Personal Finance Tool
+ExpenseTracker — Multi-User Personal Finance Tool
+A full-stack personal finance application built with Node.js/Express (backend) and React (frontend) that allows multiple users to securely track their daily expenses.
 
-A personal finance tool built with **Node.js/Express** (backend) and **React** (frontend) to track daily expenses.
+Live Demo
+Frontend:
+https://expense-tracker-pink-sigma.vercel.app/
 
----
+Backend API:
+https://expense-tracker-8drj.onrender.com/
 
-##  Live Demo
+Backend is hosted on Render free tier — first request may take ~50 seconds to wake up.
 
-| | Link |
-|---|---|
-| **Frontend** | https://expense-tracker-pink-sigma.vercel.app/ |
-| **Backend API** | https://expense-tracker-8drj.onrender.com/ |
+🚀 Features
+Multi-user support
 
->  Backend is hosted on Render's free tier — first request may take ~50 seconds to wake up.
+Secure authentication (JWT-based)
 
----
+User-specific expense tracking
 
-##  Quick Start (Local)
+Category filtering & sorting
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/riag4080/expense-tracker.git
-cd expense-tracker
+Idempotent expense creation
 
-# 2. Start the backend
-cd backend
-npm install
-npm start          # runs on http://localhost:3001
+Persistent storage using SQLite
 
-# 3. Start the frontend (new terminal)
-cd frontend
-npm install
-npm start          # runs on http://localhost:3000
-```
+Input validation at both API & DB level
 
----
+🔐 Authentication
+Authentication is implemented using JWT (JSON Web Tokens).
 
-##  Key Design Decisions
+Auth Endpoints
+POST /auth/register
+Create a new user account.
 
-### Money Handling — Integer Storage (Paise)
-Amounts are stored as **integers in paise** (1 INR = 100 paise). For example, ₹123.45 is stored as `12345`. This avoids floating-point precision issues that come up with REAL/FLOAT types. Conversion back to rupees happens only at the API boundary before sending the response.
+json
+कोड कॉपी करें
+{
+  "email": "user@example.com",
+  "password": "securePassword123"
+}
+POST /auth/login
+json
+कोड कॉपी करें
+{
+  "email": "user@example.com",
+  "password": "securePassword123"
+}
+Response:
 
-### Idempotency for Safe Retries
-The `POST /expenses` endpoint accepts an optional **`Idempotency-Key`** header (UUID). If the client retries the same request due to network failure, double-click, or page reload, the API returns the original response **without creating a duplicate**. The frontend generates a new key per form session and reuses it until submission succeeds.
+json
+कोड कॉपी करें
+{
+  "token": "jwt_token_here"
+}
+The token must be sent in all protected routes:
 
-###  Persistence — SQLite via `better-sqlite3`
-SQLite made sense here because:
-- **Data survives server restarts** — unlike in-memory stores
-- **No separate DB server needed** — runs as a file alongside the app
-- **WAL mode enabled** for better read performance
-- Right fit for a single-user personal tool
+makefile
+कोड कॉपी करें
+Authorization: Bearer <jwt_token>
+💰 Expense Handling
+All expenses are user-scoped.
+A logged-in user can only see and manage their own expenses.
 
-> PostgreSQL would make more sense if this scales to multiple users.
+💵 Money Handling — Integer Storage (Paise)
+Amounts are stored as integers in paise (1 INR = 100 paise).
 
-###  Amount Validation
-- **DB-level:** `INTEGER NOT NULL CHECK(amount > 0)` as a safety net
-- **Both frontend and backend** validate before any write happens
+Example:
 
----
+₹123.45 → stored as 12345
 
-##  API Reference
+Why?
 
-### `POST /expenses`
+Prevents floating-point precision issues
 
-**Request Headers**
-```
-Idempotency-Key: <uuid>   // optional but recommended
-```
+Ensures financial accuracy
 
-**Request Body**
-```json
+Conversion happens only at API response level
+
+🔁 Idempotency for Safe Retries
+POST /expenses accepts an optional:
+
+makefile
+कोड कॉपी करें
+Idempotency-Key: <uuid>
+If the same request is retried:
+
+The API returns the original response
+
+No duplicate expense is created
+
+Now idempotency is enforced per user, preventing cross-user conflicts.
+
+🗄 Persistence — SQLite via better-sqlite3
+SQLite was chosen because:
+
+Data survives server restarts
+
+No external DB server required
+
+Runs as a file alongside the app
+
+WAL mode enabled for better read performance
+
+Perfect for small-to-medium multi-user apps
+
+If scaling further:
+
+PostgreSQL would be a better choice
+
+🧱 Database Design (Updated)
+Users Table
+id (UUID)
+
+email (unique)
+
+password_hash
+
+created_at
+
+Expenses Table
+id (UUID)
+
+user_id (foreign key)
+
+amount (INTEGER in paise)
+
+category
+
+description
+
+date
+
+created_at
+
+All expense queries are filtered by user_id.
+
+📡 API Reference
+(All routes below require authentication unless specified.)
+
+POST /expenses
+Headers:
+
+vbnet
+कोड कॉपी करें
+Authorization: Bearer <token>
+Idempotency-Key: <uuid> (optional)
+Request:
+
+json
+कोड कॉपी करें
 {
   "amount": 150.50,
   "category": "Food",
   "description": "Lunch at office",
   "date": "2024-02-15"
 }
-```
+Response — 201 Created
 
-**Response — 201 Created**
-```json
+json
+कोड कॉपी करें
 {
   "id": "uuid",
   "amount": "150.50",
@@ -87,64 +166,90 @@ Idempotency-Key: <uuid>   // optional but recommended
   "date": "2024-02-15",
   "created_at": "2024-02-15T08:30:00.000Z"
 }
-```
-
----
-
-### `GET /expenses`
-
-```
+GET /expenses
+bash
+कोड कॉपी करें
 GET /expenses?category=Food&sort=date_desc
-```
+Response:
 
-**Response**
-```json
+json
+कोड कॉपी करें
 {
   "expenses": [...],
   "total": "1234.50",
   "count": 12
 }
-```
+GET /expenses/categories
+Returns:
 
----
+Default categories
 
-### `GET /expenses/categories`
+User-created categories (if implemented)
 
-Returns list of all categories (defaults + any added by user).
-
----
-
-##  Trade-offs (due to timebox)
-
-| Skipped | Reason |
-|---|---|
-| Authentication | Out of scope for single-user tool |
-| Edit / Delete expenses | Not in acceptance criteria |
-| Pagination | Dataset small enough to load at once |
-| Rate limiting | Would add for a multi-user production app |
-| Full OpenAPI spec | Would add for team use |
-
----
-
-##  What I Intentionally Did Not Do
-
-- **No user accounts** — single-user tool as specified
-- **No currency conversion** — INR only, per spec
-- **No real-time sync** — refreshing on action is sufficient here
-- **No Docker Compose** — SQLite needs no container, kept it simple
-
----
-
-##  Automated Tests
-
-```bash
+🧪 Automated Tests
+bash
+कोड कॉपी करें
 cd backend
 npm test
-```
+Tests cover:
 
-**Tests cover:**
--  Creating a valid expense
--  Rejecting negative amounts and missing fields
--  Idempotency (same key returns same result)
-- Filtering by category
-- Sorting by date (newest first)
+User registration & login
+
+JWT validation
+
+Creating a valid expense
+
+Rejecting negative amounts
+
+Idempotency (same key returns same result)
+
+Filtering by category
+
+Sorting by date
+
+User isolation (one user cannot see another’s data)
+
+⚖️ Trade-offs
+Skipped	Reason
+Password reset	Out of scope
+Email verification	Not required for MVP
+Pagination	Dataset small enough
+Rate limiting	Would add in production
+OAuth login	Simple JWT auth sufficient
+PostgreSQL	SQLite adequate for current scale
+
+❌ What I Intentionally Did Not Do
+No currency conversion (INR only)
+
+No real-time sync (refresh on action sufficient)
+
+No Docker Compose (SQLite requires no external DB)
+
+No role-based permissions (all users equal access to their own data only)
+
+🛠 Quick Start (Local)
+bash
+कोड कॉपी करें
+# 1. Clone the repo
+git clone https://github.com/riag4080/Expense-Tracker-with-Multi-User.git
+cd Expense-Tracker-with-Multi-User
+
+# 2. Start backend
+cd backend
+npm install
+npm start
+
+# 3. Start frontend (new terminal)
+cd frontend
+npm install
+npm start
+Backend runs on:
+
+arduino
+कोड कॉपी करें
+http://localhost:3001
+Frontend runs on:
+
+arduino
+कोड कॉपी करें
+http://localhost:3000
