@@ -31,35 +31,42 @@ npm start          # http://localhost:3001
 cd frontend
 npm install
 npm start          # http://localhost:3000
-🧠 Key Design Decisions
-🔐 Authentication & Multi-User Support
-The app now supports multiple users with secure authentication.
 
-Tech Stack
-JWT (JSON Web Token) for stateless authentication
 
-bcrypt for password hashing
+## 🧠 Key Design Decisions
 
-Auth middleware to protect private routes
+### 🔐 Authentication & Multi-User Support
 
-Authentication Flow
-User registers (/auth/register)
+The app now supports **multiple users** with secure authentication.
 
-Password is hashed before storing
+#### Tech Stack
 
-User logs in → JWT token is generated
+- JWT (JSON Web Token) for stateless authentication  
+- bcrypt for password hashing  
+- Auth middleware to protect private routes  
 
-Client stores token and sends:
+#### Authentication Flow
+
+1. User registers (`/auth/register`)
+2. Password is hashed before storing
+3. User logs in → JWT token is generated
+4. Client stores token and sends:
 
 Authorization: Bearer <token>
-Backend verifies token and extracts user_id
 
-All expense operations are scoped to that user
 
-🗄️ Data Isolation (Core Change)
+5. Backend verifies token and extracts `user_id`
+6. All expense operations are scoped to that user
+
+---
+
+### 🗄️ Data Isolation (Core Change)
+
 Every expense belongs to a specific user.
 
-Expenses Table (Conceptual)
+#### Expenses Table (Conceptual)
+
+```sql
 expenses (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -78,9 +85,7 @@ WHERE user_id = ?
 Amounts are stored as integers in paise:
 
 ₹123.45 → 12345
-
-Benefits:
-
+Benefits
 Avoids floating-point errors
 
 Safe arithmetic operations
@@ -91,8 +96,7 @@ Conversion happens only at API response level
 POST /expenses supports:
 
 Idempotency-Key: <uuid>
-Behavior:
-
+Behavior
 Same user + key → returns original response
 
 Prevents duplicate entries from retries / double clicks
@@ -127,14 +131,12 @@ CHECK(amount > 0)
 🔐 Authentication API
 POST /auth/register
 Request Body
-
 {
   "name": "Jitin",
   "email": "jitin@example.com",
   "password": "securePassword"
 }
 Response
-
 {
   "user": {
     "id": "uuid",
@@ -145,13 +147,11 @@ Response
 }
 POST /auth/login
 Request Body
-
 {
   "email": "jitin@example.com",
   "password": "securePassword"
 }
 Response
-
 {
   "user": {
     "id": "uuid",
@@ -164,18 +164,15 @@ GET /auth/me
 Returns currently logged-in user details.
 
 Headers
-
 Authorization: Bearer <token>
 📦 Expense API (Protected Routes)
 All routes require authentication.
 
 POST /expenses
 Headers
-
 Authorization: Bearer <token>
 Idempotency-Key: <uuid>   // optional
 Request Body
-
 {
   "amount": 150.50,
   "category": "Food",
@@ -183,7 +180,6 @@ Request Body
   "date": "2024-02-15"
 }
 Response — 201 Created
-
 {
   "id": "uuid",
   "amount": "150.50",
@@ -197,7 +193,6 @@ Example:
 
 GET /expenses?category=Food&sort=date_desc
 Response
-
 {
   "expenses": [...],
   "total": "1234.50",
@@ -212,7 +207,7 @@ Login & Register pages
 
 Protected routes
 
-Auth context (React Context API)
+Auth Context (React Context API)
 
 Auto token storage (localStorage)
 
@@ -278,13 +273,3 @@ React Frontend
 Node.js + Express API
      |
 SQLite (better-sqlite3)
-⭐ Why This Design Works
-Simple but production-minded architecture
-
-Strong separation of user data
-
-Safe money handling
-
-Retry-safe API design
-
-Easy to deploy and extend
