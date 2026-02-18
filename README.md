@@ -1,84 +1,189 @@
-#  ExpenseTracker — Full-Stack Personal Finance Tool
+# 💰 ExpenseTracker — Full-Stack Multi-User Personal Finance Tool
 
-A personal finance tool built with **Node.js/Express** (backend) and **React** (frontend) to track daily expenses.
+A personal finance tool built with **Node.js/Express (backend)** and **React (frontend)** that allows **multiple users** to securely manage their own expenses using authentication.
 
 ---
 
-##  Live Demo
+## 🚀 Live Demo
 
 | | Link |
 |---|---|
 | **Frontend** | https://expense-tracker-with-multi-user.vercel.app/ |
-| **Backend API** | https://expense-tracker-with-multi-user.onrender.com/|
+| **Backend API** | https://expense-tracker-with-multi-user.onrender.com/ |
 
->  Backend is hosted on Render's free tier — first request may take ~50 seconds to wake up.
+> Backend is hosted on Render’s free tier — first request may take ~50 seconds to wake up.
 
 ---
 
-##  Quick Start (Local)
+## ⚡ Quick Start (Local)
 
 ```bash
 # 1. Clone the repo
 git clone https://github.com/riag4080/expense-tracker.git
 cd expense-tracker
 
-# 2. Start the backend
+# 2. Start backend
 cd backend
 npm install
-npm start          # runs on http://localhost:3001
+npm start          # http://localhost:3001
 
-# 3. Start the frontend (new terminal)
+# 3. Start frontend (new terminal)
 cd frontend
 npm install
-npm start          # runs on http://localhost:3000
-```
+npm start          # http://localhost:3000
+🧠 Key Design Decisions
+🔐 Authentication & Multi-User Support
+The app now supports multiple users with secure authentication.
 
----
+Tech Stack
+JWT (JSON Web Token) for stateless authentication
 
-##  Key Design Decisions
+bcrypt for password hashing
 
-### Money Handling — Integer Storage (Paise)
-Amounts are stored as **integers in paise** (1 INR = 100 paise). For example, ₹123.45 is stored as `12345`. This avoids floating-point precision issues that come up with REAL/FLOAT types. Conversion back to rupees happens only at the API boundary before sending the response.
+Auth middleware to protect private routes
 
-### Idempotency for Safe Retries
-The `POST /expenses` endpoint accepts an optional **`Idempotency-Key`** header (UUID). If the client retries the same request due to network failure, double-click, or page reload, the API returns the original response **without creating a duplicate**. The frontend generates a new key per form session and reuses it until submission succeeds.
+Authentication Flow
+User registers (/auth/register)
 
-###  Persistence — SQLite via `better-sqlite3`
-SQLite made sense here because:
-- **Data survives server restarts** — unlike in-memory stores
-- **No separate DB server needed** — runs as a file alongside the app
-- **WAL mode enabled** for better read performance
-- Right fit for a single-user personal tool
+Password is hashed before storing
 
-> PostgreSQL would make more sense if this scales to multiple users.
+User logs in → JWT token is generated
 
-###  Amount Validation
-- **DB-level:** `INTEGER NOT NULL CHECK(amount > 0)` as a safety net
-- **Both frontend and backend** validate before any write happens
+Client stores token and sends:
 
----
+Authorization: Bearer <token>
+Backend verifies token and extracts user_id
 
-##  API Reference
+All expense operations are scoped to that user
 
-### `POST /expenses`
+🗄️ Data Isolation (Core Change)
+Every expense belongs to a specific user.
 
-**Request Headers**
-```
-Idempotency-Key: <uuid>   // optional but recommended
-```
+Expenses Table (Conceptual)
+expenses (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK(amount > 0),
+  category TEXT,
+  description TEXT,
+  date TEXT,
+  created_at TEXT
+)
+All queries are automatically filtered:
 
-**Request Body**
-```json
+WHERE user_id = ?
+➡️ Users cannot view or modify other users’ expenses.
+
+💰 Money Handling — Integer Storage (Paise)
+Amounts are stored as integers in paise:
+
+₹123.45 → 12345
+
+Benefits:
+
+Avoids floating-point errors
+
+Safe arithmetic operations
+
+Conversion happens only at API response level
+
+🔁 Idempotency for Safe Retries
+POST /expenses supports:
+
+Idempotency-Key: <uuid>
+Behavior:
+
+Same user + key → returns original response
+
+Prevents duplicate entries from retries / double clicks
+
+Different users → independent records
+
+💾 Persistence — SQLite via better-sqlite3
+SQLite is retained because:
+
+Data survives restarts
+
+No external DB service required
+
+WAL mode improves read performance
+
+Great fit for small-to-medium apps
+
+PostgreSQL can be used later for scaling.
+
+✅ Validation Strategy
+Validation happens at multiple layers:
+
+Frontend validation for UX
+
+Backend validation for safety
+
+Database constraints as final guard
+
+Example DB constraint:
+
+CHECK(amount > 0)
+🔐 Authentication API
+POST /auth/register
+Request Body
+
+{
+  "name": "Jitin",
+  "email": "jitin@example.com",
+  "password": "securePassword"
+}
+Response
+
+{
+  "user": {
+    "id": "uuid",
+    "name": "Jitin",
+    "email": "jitin@example.com"
+  },
+  "token": "jwt-token"
+}
+POST /auth/login
+Request Body
+
+{
+  "email": "jitin@example.com",
+  "password": "securePassword"
+}
+Response
+
+{
+  "user": {
+    "id": "uuid",
+    "name": "Jitin",
+    "email": "jitin@example.com"
+  },
+  "token": "jwt-token"
+}
+GET /auth/me
+Returns currently logged-in user details.
+
+Headers
+
+Authorization: Bearer <token>
+📦 Expense API (Protected Routes)
+All routes require authentication.
+
+POST /expenses
+Headers
+
+Authorization: Bearer <token>
+Idempotency-Key: <uuid>   // optional
+Request Body
+
 {
   "amount": 150.50,
   "category": "Food",
   "description": "Lunch at office",
   "date": "2024-02-15"
 }
-```
+Response — 201 Created
 
-**Response — 201 Created**
-```json
 {
   "id": "uuid",
   "amount": "150.50",
@@ -87,64 +192,99 @@ Idempotency-Key: <uuid>   // optional but recommended
   "date": "2024-02-15",
   "created_at": "2024-02-15T08:30:00.000Z"
 }
-```
+GET /expenses
+Example:
 
----
-
-### `GET /expenses`
-
-```
 GET /expenses?category=Food&sort=date_desc
-```
+Response
 
-**Response**
-```json
 {
   "expenses": [...],
   "total": "1234.50",
   "count": 12
 }
-```
+GET /expenses/categories
+Returns categories used by the logged-in user.
 
----
+🎨 Frontend Changes for Multi-User
+Added Features
+Login & Register pages
 
-### `GET /expenses/categories`
+Protected routes
 
-Returns list of all categories (defaults + any added by user).
+Auth context (React Context API)
 
----
+Auto token storage (localStorage)
 
-##  Trade-offs (due to timebox)
+Logout support
 
-| Skipped | Reason |
-|---|---|
-| Authentication | Out of scope for single-user tool |
-| Edit / Delete expenses | Not in acceptance criteria |
-| Pagination | Dataset small enough to load at once |
-| Rate limiting | Would add for a multi-user production app |
-| Full OpenAPI spec | Would add for team use |
+Redirect to login if token missing
 
----
+⚖️ Trade-offs (Due to Timebox)
+Skipped	Reason
+Email verification	Out of scope
+Password reset flow	Not required initially
+Refresh tokens	Added complexity
+Pagination	Dataset expected to be small
+Rate limiting	Add for production
+OAuth login	Optional future enhancement
+🚫 What I Intentionally Did Not Do
+No real-time sync (refresh after actions is sufficient)
 
-##  What I Intentionally Did Not Do
+No currency conversion (INR only)
 
-- **No user accounts** — single-user tool as specified
-- **No currency conversion** — INR only, per spec
-- **No real-time sync** — refreshing on action is sufficient here
-- **No Docker Compose** — SQLite needs no container, kept it simple
+No microservices (kept architecture simple)
 
----
+No Docker Compose (SQLite works locally)
 
-##  Automated Tests
-
-```bash
+🧪 Automated Tests
 cd backend
 npm test
-```
+Tests Cover
+User registration & login
 
-**Tests cover:**
--  Creating a valid expense
--  Rejecting negative amounts and missing fields
--  Idempotency (same key returns same result)
-- Filtering by category
-- Sorting by date (newest first)
+JWT-protected routes
+
+Creating expenses
+
+Rejecting invalid amounts
+
+Idempotency behavior
+
+User-level data isolation
+
+Filtering & sorting
+
+🔮 Future Improvements
+Edit / Delete expense
+
+Monthly analytics dashboard
+
+Charts (category breakdown)
+
+Export CSV / PDF
+
+Budget limits & alerts
+
+Migration to PostgreSQL
+
+Refresh-token authentication
+
+🏗️ Architecture Summary
+React Frontend
+     |
+     | JWT Auth
+     |
+Node.js + Express API
+     |
+SQLite (better-sqlite3)
+⭐ Why This Design Works
+Simple but production-minded architecture
+
+Strong separation of user data
+
+Safe money handling
+
+Retry-safe API design
+
+Easy to deploy and extend
