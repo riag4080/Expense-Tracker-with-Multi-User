@@ -19,7 +19,7 @@ A personal finance tool built with **Node.js/Express (backend)** and **React (fr
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/riag4080/expense-tracker.git
+git clone https://github.com/riag4080/Expense-Tracker-with-Multi-User.git
 cd expense-tracker
 
 # 2. Start backend
