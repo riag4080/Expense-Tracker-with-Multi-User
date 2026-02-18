@@ -8,8 +8,8 @@ A personal finance tool built with **Node.js/Express** (backend) and **React** (
 
 | | Link |
 |---|---|
-| **Frontend** | https://expense-tracker-pink-sigma.vercel.app/ |
-| **Backend API** | https://expense-tracker-8drj.onrender.com/ |
+| **Frontend** | https://expense-tracker-with-multi-user.vercel.app/ |
+| **Backend API** | https://expense-tracker-with-multi-user.onrender.com/|
 
 >  Backend is hosted on Render's free tier — first request may take ~50 seconds to wake up.
 
